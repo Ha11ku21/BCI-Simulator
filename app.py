@@ -7,7 +7,7 @@ st.title("BCI Transmission Simulator: Unified Version")
 # 各種パラメータの入力（VB.NETのデフォルト値に合わせやすいように調整）
 noiseAmp = st.slider("Noise Amplitude [μA/cm²]", 0.0, 10.0, 0.0)  # 一致確認は 0.0 を推奨
 adc_bits = st.slider("ADC Bits", 4, 16, 8)
-compression_ratio = st.slider("Compression Ratio (sk1)", 1, 1000, 10)
+compression_ratio = st.slider("Compression Ratio", 1, 1000, 10)
 run = st.button("Run")
 
 # スパイク検出の閾値を判定する関数（VB.NETのDetectSpikesに準拠：0.0V付近）
@@ -51,7 +51,7 @@ def beta_n(V): return 0.125 * np.exp(-(V + 65) / 80)
 
 if run:
     # --- パラメータをVB.NETに厳密に統一 ---
-    dt = 0.001  # タイムステップ (VB.NET: 0.0001)
+    dt = 0.0001  # タイムステップ (VB.NET: 0.0001)
     t = 50000   # ステップ数 (時間を完全に合わせる場合は 1000000 にしてください)
     
     Cm, gNa, gK, gL = 1.0, 120.0, 36.0, 0.3
