@@ -51,7 +51,7 @@ def beta_n(V): return 0.125 * np.exp(-(V + 65) / 80)
 
 if run:
     # --- パラメータをVB.NETに厳密に統一 ---
-    dt = 0.0001  # タイムステップ (VB.NET: 0.0001)
+    dt = 0.001  # タイムステップ (VB.NET: 0.0001)
     t = 50000   # ステップ数 (時間を完全に合わせる場合は 1000000 にしてください)
     
     Cm, gNa, gK, gL = 1.0, 120.0, 36.0, 0.3
@@ -113,12 +113,8 @@ if run:
             for x in range(prev_idx + 1, s):
                 Vas[x] = Vas[prev_idx] + (Vas[s] - Vas[prev_idx]) * (x - prev_idx) / sk1
                 
-    # 端数の処理（t が sk1 で割り切れない場合のケア）
-    last_mod = t % sk1
-    if last_mod != 0:
-        prev_idx = t - last_mod - 1
-        for x in range(prev_idx + 1, t):
-            Vas[x] = Vas[prev_idx]
+
+
 
     # ==========================================
     # 3. Spike (Vsp: 特徴点抽出)
