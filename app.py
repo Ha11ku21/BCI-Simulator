@@ -102,38 +102,42 @@ if run:
     # 2. Compression (Vas: 線形補間)
     # ==========================================
     # ==========================================
-# 2. Compression (VB版)
-# ==========================================
-
-Vas = np.zeros(t)
-Vas[0] = Vnormal[0]
-
-sk1 = compression_ratio
-skk = 0
-
-for s in range(1, t):
-
-    if s % sk1 == 0:
-
-        skk += 1
-
-        curr = skk * sk1
-        prev = (skk - 1) * sk1
-
-        Vas[curr] = Vnormal[curr]
-
-        for i in range(prev + 1, curr):
-
-            Vas[i] = Vas[prev] + \
-                (Vas[curr] - Vas[prev]) * \
-                (i - prev) / (curr - prev)
-
-# 最後まで一定値
-last = (t - 1) // sk1 * sk1
-Vas[last:] = Vas[last]
+    # 2. Compression (VB.NET版)
     # ==========================================
-    # 3. Spike (Vsp: 特徴点抽出)
-    # ==========================================
+    Vas = np.zeros(t)
+    Vas[0] = Vnormal[0]
+
+    sk1 = compression_ratio
+    skk = 0
+
+    for s in range(1, t):
+
+        if s % sk1 == 0:
+
+            skk += 1
+
+            curr = skk * sk1
+            prev = (skk - 1) * sk1
+
+            if curr >= t:
+                break
+
+            Vas[curr] = Vnormal[curr]
+
+            for i in range(prev + 1, curr):
+                Vas[i] = Vas[prev] + \
+                    (Vas[curr] - Vas[prev]) * \
+                    (i - prev) / (curr - prev)
+
+    # 最後のサンプル位置
+    last = (t - 1) // sk1 * sk1
+
+    # VBでは最後も元データを保持
+    Vas[last] = Vnormal[last]
+
+    # 最後の区間は一定値
+    for i in range(last + 1, t):
+        Vas[i] = Vas[last]
     spike_threshold = -65.0  # VB.NETの spikt
     Vsp = np.full(t, spike_threshold)
     spike_count = 0
