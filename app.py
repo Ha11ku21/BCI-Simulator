@@ -66,7 +66,7 @@ if run:
     m[0] = 0.05
     h[0] = 0.6
     n[0] = 0.32
-
+　　skk=0
     # 乱数シードの固定（ノイズがある場合の再現用）
     np.random.seed(42)
 
@@ -108,9 +108,10 @@ if run:
     # VB.NETの「sk = s Mod sk1」による間引きと線形補間ロジックを完全再現
     for s in range(1, t):
         if s % sk1 == 0:
-            Vas[s] = Vnormal[s]
-            prev_idx = s - sk1
-            for x in range(prev_idx + 1, s):
+            skk+=1
+            Vas[sk1*skk] = Vnormal[s]
+            x = (skk - 1) * sk1
+            for x in range(1, sk1-1):
                 Vas[x] = Vas[prev_idx] + (Vas[s] - Vas[prev_idx]) * (x - prev_idx) / sk1
                 
 
