@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 st.title("BCI Transmission Simulator: It is tailored to the smartphone's features.")
 
 noiseAmp = st.slider(
-    "Noise Amplitude",
+    "Noise Amplitude[μA/cm²]",
     0.0,
     10.0,
     1.0
@@ -19,9 +19,9 @@ adc_bits = st.slider(
 )
 
 compression_ratio = st.slider(
-    "Compression Ratio: It is tailored to the smartphone's features. In this experiment, a compression ratio 100 times that value was used.",
+    "Compression Ratio",
     1,
-    10,
+    1000,
     10
 )
 
@@ -130,16 +130,6 @@ if run:
         Vnormal[s+1] = Vnormal[s] + dt*(I1[s] - INa - IK - IL)/Cm
 
     # ADC量子化（ここは完全に外）
-    levels = 2 ** adc_bits
-    Vdigital = np.zeros(t)
-
-    vmin = np.min(Vnormal)
-    vmax = np.max(Vnormal)
-
-    for i in range(t):
-        normalized = (Vnormal[i] - vmin) / (vmax - vmin)
-        q = round(normalized * (levels - 1))
-        Vdigital[i] = q/(levels-1)*(vmax-vmin) + vmin
     spike_normal = get_spike_times(
     	Vnormal
     )
