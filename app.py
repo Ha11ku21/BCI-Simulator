@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.title("BCI Transmission Simulator: Unified Version")
+st.title("BCI Transmission Simulator: BCI Transmission Simulator: As this was created to suit smartphones, it may not necessarily yield the same results as an actual experiment.")
 
 # 各種パラメータの入力（VB.NETのデフォルト値に合わせやすいように調整）
 noiseAmp = st.slider("Noise Amplitude [μA/cm²]", 0.0, 10.0, 0.0)  # 一致確認は 0.0 を推奨
