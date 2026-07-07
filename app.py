@@ -4,12 +4,13 @@ import matplotlib.pyplot as plt
 
 st.title("BCI Transmission Simulator: Unified Version")
 
-noiseAmp = st.slider("Noise Amplitude[μA/cm²]", 0.0, 10.0, 0.0) # 一致確認のため初期値0を推奨
+# 各種パラメータの入力（VB.NETのデフォルト値に合わせやすいように調整）
+noiseAmp = st.slider("Noise Amplitude [μA/cm²]", 0.0, 10.0, 0.0)  # 一致確認は 0.0 を推奨
 adc_bits = st.slider("ADC Bits", 4, 16, 8)
-compression_ratio = st.slider("Compression Ratio", 1, 1000, 10)
+compression_ratio = st.slider("Compression Ratio (sk1)", 1, 1000, 10)
 run = st.button("Run")
 
-# スパイク検出の閾値をVB.NET（0V付近）に合わせる
+# スパイク検出の閾値を判定する関数（VB.NETのDetectSpikesに準拠：0.0V付近）
 def get_spike_times(V, threshold=0.0):
     spikes = []
     for i in range(1, len(V)):
@@ -17,14 +18,14 @@ def get_spike_times(V, threshold=0.0):
             spikes.append(i)
     return np.array(spikes)
 
-# 発火タイミングエラーの計算（VB.NETのロジックを再現）
+# 発火タイミングエラーの計算（VB.NETの timingED / timingErr のアルゴリズムを再現）
 def firing_error(normal_spikes, test_spikes, dt):
     if len(normal_spikes) == 0 or len(test_spikes) == 0:
         return 0.0
     
     total_err = 0.0
     for sn in normal_spikes:
-        # 最も近いスパイクとの差分（インデックスの差）を探す
+        # 最も近いスパイクとの差分（インデックスの絶対差）を探索
         best_err = np.min(np.abs(test_spikes - sn))
         total_err += best_err * dt
         
@@ -47,10 +48,11 @@ def alpha_n(V):
 
 def beta_n(V): return 0.125 * np.exp(-(V + 65) / 80)
 
+
 if run:
     # --- パラメータをVB.NETに厳密に統一 ---
-    dt = 0.0001  # VB.NET: 0.0001
-    t = 100000   # ステップ数（時間を合わせる場合は調整してください）
+    dt = 0.0001  # タイムステップ (VB.NET: 0.0001)
+    t = 100000   # ステップ数 (時間を完全に合わせる場合は 1000000 にしてください)
     
     Cm, gNa, gK, gL = 1.0, 120.0, 36.0, 0.3
     ENa, EK, EL = 50.0, -77.0, -54.4
@@ -68,9 +70,8 @@ if run:
     # 乱数シードの固定（ノイズがある場合の再現用）
     np.random.seed(42)
 
-    # 入力電流計算
+    # 入力電流計算 (全区間でベース電流10が入るロジック)
     for s in range(t):
-        # VB.NETは s1=0, s2=t なので全区間でベース電流10が入る
         base = 10.0
         if noiseAmp > 0:
             noise = noiseAmp * (np.random.random() - 0.5)
@@ -90,35 +91,39 @@ if run:
 
         Vnormal[s+1] = Vnormal[s] + dt * (I1[s] - INa - IK - IL) / Cm
 
-    # --- 1. Digital (ADC量子化幅の計算ロジックをVBに統合) ---
+    # ==========================================
+    # 1. Digital (ADC量子化)
+    # ==========================================
     Vmin, Vmax = -100.0, 50.0
     stepSize = (Vmax - Vmin) / (2 ** adc_bits)
-    # VB.NETの Math.Round() は四捨五入（銀行丸め注意、Pythonの補正）
     Vdigital = np.round((Vnormal - Vmin) / stepSize) * stepSize + Vmin
 
-    # --- 2. Compression (Vas: 線形補間) ---
+    # ==========================================
+    # 2. Compression (Vas: 線形補間)
+    # ==========================================
     Vas = np.zeros(t)
     Vas[0] = Vnormal[0]
     sk1 = compression_ratio
     
-    # VB.NETの「sk = s Mod sk1」による間引きと線形補間ロジックの再現
+    # VB.NETの「sk = s Mod sk1」による間引きと線形補間ロジックを完全再現
     for s in range(1, t):
         if s % sk1 == 0:
             Vas[s] = Vnormal[s]
             prev_idx = s - sk1
-            # 隙間を直線補間
             for x in range(prev_idx + 1, s):
                 Vas[x] = Vas[prev_idx] + (Vas[s] - Vas[prev_idx]) * (x - prev_idx) / sk1
-    # 端数の処理（tがsk1で割り切れない場合、最後の残りを補間）
+                
+    # 端数の処理（t が sk1 で割り切れない場合のケア）
     last_mod = t % sk1
     if last_mod != 0:
         prev_idx = t - last_mod - 1
         for x in range(prev_idx + 1, t):
-            Vas[x] = Vas[prev_idx] # 簡易的にホールド、またはVBのロジックに合わせる
+            Vas[x] = Vas[prev_idx]
 
-    # --- 3. Spike (Vsp: 特徴点抽出) ---
-    # VB.NETの spikt (閾値) を -65.0 とする
-    spike_threshold = -65.0 
+    # ==========================================
+    # 3. Spike (Vsp: 特徴点抽出)
+    # ==========================================
+    spike_threshold = -65.0  # VB.NETの spikt
     Vsp = np.full(t, spike_threshold)
     spike_count = 0
     count = 0
@@ -153,19 +158,33 @@ if run:
                 Vsp[s3] = Vsp[ssp3] + (Vsp[ssp2] - Vsp[ssp3]) * (s3 - ssp3) / (ssp2 - ssp3)
             count = 0
 
-    # --- スパイクタイミング評価 ---
-    # 発火検出用の閾値（spikthk）は双方 0.0V と判定
+    # ==========================================
+    # 評価値の計算 (Evaluation)
+    # ==========================================
+    # スパイク発火時間の取得 (判定閾値は 0.0V)
     spike_normal = get_spike_times(Vnormal, threshold=0.0)
     spike_digital = get_spike_times(Vdigital, threshold=0.0)
     spike_as = get_spike_times(Vas, threshold=0.0)
     spike_sp = get_spike_times(Vsp, threshold=0.0)
 
+    # 発火タイミングエラー (Firing Error)
     ignition_digital = firing_error(spike_normal, spike_digital, dt)
     ignition_compression = firing_error(spike_normal, spike_as, dt)
     ignition_spike = firing_error(spike_normal, spike_sp, dt)
 
-    # --- 消費電力・データ量計算（VB.NET準拠） ---
-    sr, tr = 16, 32  # VB.NETの値を採用
+    # RMSEの計算
+    rmse_digital = np.sqrt(np.mean((Vnormal - Vdigital) ** 2))
+    rmse_compression = np.sqrt(np.mean((Vnormal - Vas) ** 2))
+    rmse_spike = np.sqrt(np.mean((Vnormal - Vsp) ** 2))
+
+    # 相関係数 (Correlation) の計算
+    corr_digital = np.corrcoef(Vnormal, Vdigital)[0, 1]
+    corr_compression = np.corrcoef(Vnormal, Vas)[0, 1]
+    corr_spike = np.corrcoef(Vnormal, Vsp)[0, 1]
+
+    # 消費電力計算 (VB.NET側の計算式を完全再現)
+    sr, tr = 16, 32
+    
     bitNormal = t * sr
     rateNormal = bitNormal / (t * dt)
     powerNormal = rateNormal * 1e-8
@@ -178,148 +197,55 @@ if run:
     rateCompression = bitCompression / (t * dt)
     powerCompression = rateCompression * 1e-8
 
-    bitSpike = spike_count * tr  # スパイク数 × tr
+    bitSpike = spike_count * tr  # 特徴点スパイク数に依存
     rateSpike = bitSpike / (t * dt)
     powerSpike = rateSpike * 1e-8
 
-  
-    rmse_digital = np.sqrt(
-        np.mean(
-            (Vnormal - Vdigital) ** 2
-        )
-    )
-
-    corr_digital = np.corrcoef(
-        Vnormal,
-        Vdigital
-    )[0, 1]
-
-    rmse_compression = np.sqrt(
-        np.mean(
-            (Vnormal - Vcompression) ** 2
-        )
-    )
-
-    corr_compression = np.corrcoef(
-        Vnormal,
-        Vcompression
-    )[0, 1]
-
-    rmse_spike = np.sqrt(
-        np.mean(
-            (Vnormal - Vsp) ** 2
-        )
-    )
-
-    corr_spike = np.corrcoef(
-        Vnormal,
-        Vsp
-    )[0, 1]
-
-    ignition_digital = firing_error(
-        spike_normal,
-        spike_digital
-    )
-
-    ignition_compression = firing_error(
-        spike_normal,
-        spike_compression
-    )
-
-    ignition_spike = firing_error(
-        spike_normal,
-        spike_spike
-    )
-
-    # -----------------------------
-    # Graph
-    # -----------------------------
-    fig, ax = plt.subplots(
-        figsize=(12, 5)
-    )
-
-    ax.plot(
-        Vnormal,
-        label="Normal"
-    )
-
-    ax.plot(
-        Vdigital,
-        label="Digital"
-    )
-
-    ax.plot(
-        Vcompression,
-        label="Compression"
-    )
-
-    ax.plot(
-        Vsp,
-        label="Spike"
-    )
-
-    ax.set_title(
-        "BCI Communication Methods"
-    )
-
-    ax.set_xlabel(
-        "Time Step"
-    )
-
-    ax.set_ylabel(
-        "Membrane Potential (mV)"
-    )
-
+    # ==========================================
+    # グラフ描画 (Graph)
+    # ==========================================
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.plot(Vnormal, label="Normal", color="black", alpha=0.7)
+    ax.plot(Vdigital, label="Digital", linestyle="--", alpha=0.8)
+    ax.plot(Vas, label="Compression (Vas)", linestyle="-.", alpha=0.8)
+    ax.plot(Vsp, label="Spike (Vsp)", linestyle=":", alpha=0.8)
+    
+    ax.set_title("BCI Communication Methods (Unified)")
+    ax.set_xlabel("Time Step")
+    ax.set_ylabel("Membrane Potential (mV)")
     ax.legend()
-
     st.pyplot(fig)
 
-    # -----------------------------
-    # Table
-    # -----------------------------
-    st.subheader(
-        "Evaluation"
-    )
+    # ==========================================
+    # 結果表示 (Table & Metrics)
+    # ==========================================
+    st.subheader("Evaluation Metrics")
 
-    st.write(
-        "Digital Firing Error",
-        ignition_digital
-    )
-
-    st.write(
-        "Compression Firing Error",
-        ignition_compression
-    )
-
-    st.write(
-        "Spike Firing Error",
-        ignition_spike
-    )
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Digital Firing Error", f"{ignition_digital:.6f}")
+    col2.metric("Compression Firing Error", f"{ignition_compression:.6f}")
+    col3.metric("Spike Firing Error", f"{ignition_spike:.6f}")
 
     st.table({
-        "Method": [
-            "Digital",
-            "Compression",
-            "Spike"
-        ],
+        "Method": ["Digital", "Compression", "Spike"],
         "RMSE": [
-            round(rmse_digital, 4),
-            round(rmse_compression, 4),
-            round(rmse_spike, 4)
+            round(rmse_digital, 6),
+            round(rmse_compression, 6),
+            round(rmse_spike, 6)
         ],
         "Correlation": [
-            round(corr_digital, 4),
-            round(corr_compression, 4),
-            round(corr_spike, 4)
+            round(corr_digital, 6),
+            round(corr_compression, 6),
+            round(corr_spike, 6)
         ],
         "Power": [
-            round(powerDigital, 8),
-            round(powerCompression, 8),
-            round(powerSpike, 8)
+            f"{powerDigital:.12f}",
+            f"{powerCompression:.12f}",
+            f"{powerSpike:.12f}"
         ],
-        "Data Volume": [
+        "Data Volume [Points]": [
             t,
-            len(compressed_data),
-            spike_points
+            int(t / sk1),
+            spike_count
         ]
     })
