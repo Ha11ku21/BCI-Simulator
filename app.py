@@ -108,7 +108,7 @@ if run:
     # VB.NETの「sk = s Mod sk1」による間引きと線形補間ロジックを完全再現
     for s in range(1, t):
         if s % sk1 == 0:
-            skk+=1
+            skk　+=　1
             Vas[sk1*skk] = Vnormal[s]
             x = (skk - 1) * sk1
             for x in range(1, sk1-1):
