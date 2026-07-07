@@ -66,7 +66,7 @@ if run:
     m[0] = 0.05
     h[0] = 0.6
     n[0] = 0.32
-　　skk=0
+　　skk　=　0
     # 乱数シードの固定（ノイズがある場合の再現用）
     np.random.seed(42)
 
@@ -101,18 +101,36 @@ if run:
     # ==========================================
     # 2. Compression (Vas: 線形補間)
     # ==========================================
-    Vas = np.zeros(t)
-    Vas[0] = Vnormal[0]
-    sk1 = compression_ratio
-    
-    # VB.NETの「sk = s Mod sk1」による間引きと線形補間ロジックを完全再現
-    for s in range(1, t):
-        if s % sk1 == 0:
-            skk　+=　1
-            Vas[sk1*skk] = Vnormal[s]
-            x = (skk - 1) * sk1
-            for x in range(1, sk1-1):
-                Vas[x] = Vas[prev_idx] + (Vas[s] - Vas[prev_idx]) * (x - prev_idx) / sk1
+    # ==========================================
+# 2. Compression (VB版)
+# ==========================================
+
+Vas = np.zeros(t)
+Vas[0] = Vnormal[0]
+
+sk1 = compression_ratio
+skk = 0
+
+for s in range(1, t):
+
+    if s % sk1 == 0:
+
+        skk += 1
+
+        curr = skk * sk1
+        prev = (skk - 1) * sk1
+
+        Vas[curr] = Vnormal[curr]
+
+        for i in range(prev + 1, curr):
+
+            Vas[i] = Vas[prev] + \
+                (Vas[curr] - Vas[prev]) * \
+                (i - prev) / (curr - prev)
+
+# 最後まで一定値
+last = (t - 1) // sk1 * sk1
+Vas[last:] = Vas[last]
                 
 
 
