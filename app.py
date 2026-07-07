@@ -204,7 +204,7 @@ if run:
     rateNormal = bitNormal / (t * dt)
     powerNormal = rateNormal * 1e-8
 
-    bitDigital = t * adc_bits
+    bitDigital = t * 16
     rateDigital = bitDigital / (t * dt)
     powerDigital = rateDigital * 1e-8
 
